@@ -1,7 +1,7 @@
 
-## Getting Started:
+# Getting Started:
 
-### Setting up next-app locally
+## Setting up next-app locally:
 
 First clone the repository locally, by running the following command
 
@@ -17,9 +17,9 @@ npm install
 
 
 
-## Run Locally
+# Run Locally:
 
-### To Start backend
+## To Start backend:
 
 cd to backend directory, and run
 
@@ -29,16 +29,17 @@ cd to backend directory, and run
 ```
 This will bootstrap the backend with ability of Database connections
 
-##### Note : create a .env at room level and store
+#### Note : create a .env at room level and store
 ```DATABASE_URL``` for db connections
 
-#### To start in Dev mode
+### To start in Dev mode:
 
 to start the backend in dev mode, run
 ```bash
   npm run dev
 ```
 
+### To start in Production mode:
 Then to build the backend app first. make sure you have typescript complier installed.
 
 if not installed, then run ```npm install -g typescript```
@@ -61,10 +62,14 @@ to run app, run
 ```
 this will make your backend up and running Locally at port ```4000```
 
-### To Start Frontend
 
+## To Start Frontend:
+
+### To start in Dev mode:
 cd to react-app directory, and run ```npm run dev``` to run the app in development mode.
 
+
+### To start in Production mode:
 if you want to build the app, run ```npm run build```. A dist folder will have all the files of complied frontend.
 
 To run the complied frontend, run
@@ -76,7 +81,7 @@ To run the complied frontend, run
 this will make your frontend up and running Locally at port ```5173``` if started in dev mode. and at port ```4173``` if started in production mode  
 
 
-## Appendix
+# Appendix:
 
 Any additional information goes here
 

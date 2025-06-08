@@ -15,27 +15,6 @@ cd to react-app and backend directories to install dependencies by running
 npm install
 ```
 
-The change the domain name in request URL in react-app to 
-```
-http://localhost:3000
-```
-Then in react-app from vite.config.ts remove. So that it can run locally
-
-```
-server: {
-    host: true, // Allows external access
-    allowedHosts: ['younglabs.tumsab.xyz'], // Add your domain here
-  }
-```
-
-
-
-
-
-
-
-
-
 
 
 ## Run Locally

@@ -35,6 +35,10 @@ async function start() {
     }
   });
 
+  app.get("/",(req : Request, res : Response)=>{
+    res.json("Hello from web-postman http server")
+  })
+
   app.listen(4000, () => {
     console.log("Server running on http://localhost:4000");
   });

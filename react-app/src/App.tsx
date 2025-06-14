@@ -38,7 +38,7 @@ function App() {
     setEnvironments(StorageService.loadEnvironments());
     setHistory(StorageService.loadHistory());
 
-    axios.get("http://localhost:4000/history").then((res)=>{
+    axios.get("https://web-postman.onrender.com/history").then((res)=>{
       const result = res.data.data
       
       setHistory(result)
@@ -78,7 +78,7 @@ function App() {
       //   activeEnv?.variables
       // );
 
-      const result = await axios.post("http://localhost:4000/proxy", {request: currentRequest, environment:activeEnv?.variables})
+      const result = await axios.post("https://web-postman.onrender.com/proxy", {request: currentRequest, environment:activeEnv?.variables})
       console.log(response?.data)
       setResponse(result.data);
       

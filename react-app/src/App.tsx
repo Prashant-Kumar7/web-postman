@@ -1,4 +1,4 @@
-import  { useState, useEffect } from 'react';
+import  { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import RequestBuilder from './components/RequestBuilder';
@@ -32,20 +32,101 @@ function App() {
   const [history, setHistory] = useState<RequestHistory[]>([]);
   const [activeTab, setActiveTab] = useState<'collections' | 'history'>('collections');
   const [showEnvironmentManager, setShowEnvironmentManager] = useState(false);
+  
+  // Pagination state
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [historyTotalCount, setHistoryTotalCount] = useState(0);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLimit] = useState(10); // Items per page
+  const [useLazyLoading, setUseLazyLoading] = useState(false); // Toggle between pagination and lazy loading
+  
+  // Cache for history pages using refs to avoid dependency issues
+  const historyCacheRef = useRef<Map<number, { data: RequestHistory[], totalPages: number, totalCount: number }>>(new Map());
+  const cacheTimestampsRef = useRef<Map<number, number>>(new Map());
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
+
+  // Load history with pagination and caching
+  const loadHistory = useCallback(async (page: number, forceRefresh = false) => {
+    // Check cache first (unless force refresh)
+    if (!forceRefresh && historyCacheRef.current.has(page)) {
+      const cached = historyCacheRef.current.get(page)!;
+      const cacheTime = cacheTimestampsRef.current.get(page) || 0;
+      const now = Date.now();
+      
+      // Use cache if it's still valid
+      if (now - cacheTime < CACHE_TTL) {
+        setHistory(cached.data);
+        setHistoryTotalPages(cached.totalPages);
+        setHistoryTotalCount(cached.totalCount);
+        setHistoryPage(page);
+        return;
+      }
+    }
+    
+    setHistoryLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/history`, {
+        params: {
+          page,
+          limit: historyLimit
+        }
+      });
+      const result = res.data;
+      const historyData = result.data || [];
+      
+      // Update cache
+      historyCacheRef.current.set(page, {
+        data: historyData,
+        totalPages: result.totalPages || 1,
+        totalCount: result.totalCount || 0
+      });
+      cacheTimestampsRef.current.set(page, Date.now());
+      
+      setHistory(historyData);
+      setHistoryTotalPages(result.totalPages || 1);
+      setHistoryTotalCount(result.totalCount || 0);
+      setHistoryPage(page);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+      // Fallback to localStorage
+      setHistory(StorageService.loadHistory());
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [historyLimit]);
+
+  // Load more history for lazy loading
+  const loadMoreHistory = useCallback(async () => {
+    if (historyPage >= historyTotalPages || historyLoading) return;
+    
+    setHistoryLoading(true);
+    try {
+      const nextPage = historyPage + 1;
+      const res = await axios.get(`${API_BASE_URL}/history`, {
+        params: {
+          page: nextPage,
+          limit: historyLimit
+        }
+      });
+      const result = res.data;
+      setHistory(prev => [...prev, ...(result.data || [])]);
+      setHistoryTotalPages(result.totalPages || 1);
+      setHistoryTotalCount(result.totalCount || 0);
+      setHistoryPage(nextPage);
+    } catch (error) {
+      console.error('Failed to load more history:', error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [historyPage, historyTotalPages, historyLoading, historyLimit]);
 
   // Load data from localStorage on mount
   useEffect(() => {
     setCollections(StorageService.loadCollections());
     setEnvironments(StorageService.loadEnvironments());
-    setHistory(StorageService.loadHistory());
-
-    axios.get(`${API_BASE_URL}/history`).then((res)=>{
-      const result = res.data.data
-      
-      setHistory(result)
-    })
-
-  }, []);
+    loadHistory(1);
+  }, [loadHistory]);
 
   // Save collections when they change
   useEffect(() => {
@@ -57,10 +138,12 @@ function App() {
     StorageService.saveEnvironments(environments);
   }, [environments]);
 
-  // Save history when it changes
+  // Refresh history when tab changes to history (only on tab change, not on page change)
   useEffect(() => {
-    StorageService.saveHistory(history);
-  }, [history]);
+    if (activeTab === 'history') {
+      loadHistory(1); // Always load page 1 when switching to history tab
+    }
+  }, [activeTab, loadHistory]);
 
   const sendRequest = async () => {
     if (!currentRequest.url.trim()) {
@@ -83,14 +166,8 @@ function App() {
       console.log(response?.data)
       setResponse(result.data);
       
-      // Add to history
-      const historyItem: RequestHistory = {
-        id: Date.now().toString(),
-        request: { ...currentRequest },
-        response: result.data,
-        timestamp: new Date()
-      };
-      setHistory(prev => [...prev, historyItem]);
+      // Reload first page of history to show the new request (force refresh to clear cache)
+      await loadHistory(1, true);
       
     } catch (err: any) {
       setError(err.message);
@@ -207,6 +284,14 @@ function App() {
         onDeleteRequest={deleteRequest}
         onExportData={exportData}
         onImportData={importData}
+        historyPage={historyPage}
+        historyTotalPages={historyTotalPages}
+        historyTotalCount={historyTotalCount}
+        historyLoading={historyLoading}
+        onHistoryPageChange={loadHistory}
+        onLoadMoreHistory={loadMoreHistory}
+        useLazyLoading={useLazyLoading}
+        onToggleLazyLoading={setUseLazyLoading}
       />
 
       {/* Main Content */}

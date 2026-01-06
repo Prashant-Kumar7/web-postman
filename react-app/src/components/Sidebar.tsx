@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Folder, 
   Plus, 
   History, 
-   
   Download, 
   Upload,
   Trash2,
-  
-  Play
+  Play,
+  ChevronLeft,
+  ChevronRight,
+  Loader
 } from 'lucide-react';
 import type { Collection, RequestHistory, HttpRequest } from '../types/api';
 
@@ -23,6 +24,14 @@ interface SidebarProps {
   onDeleteRequest: (collectionId: string, requestId: string) => void;
   onExportData: () => void;
   onImportData: (data: any) => void;
+  historyPage?: number;
+  historyTotalPages?: number;
+  historyTotalCount?: number;
+  historyLoading?: boolean;
+  onHistoryPageChange?: (page: number) => void;
+  onLoadMoreHistory?: () => void;
+  useLazyLoading?: boolean;
+  onToggleLazyLoading?: (enabled: boolean) => void;
 }
 
 export default function Sidebar({
@@ -35,9 +44,42 @@ export default function Sidebar({
   onDeleteCollection,
   onDeleteRequest,
   onExportData,
-  onImportData
+  onImportData,
+  historyPage = 1,
+  historyTotalPages = 1,
+  historyTotalCount = 0,
+  historyLoading = false,
+  onHistoryPageChange,
+  onLoadMoreHistory,
+  useLazyLoading = false,
+  onToggleLazyLoading
 }: SidebarProps) {
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+  const historyEndRef = useRef<HTMLDivElement>(null);
+
+  // Infinite scroll for lazy loading
+  useEffect(() => {
+    if (!useLazyLoading || activeTab !== 'history' || !onLoadMoreHistory) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !historyLoading && historyPage < historyTotalPages) {
+          onLoadMoreHistory();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (historyEndRef.current) {
+      observer.observe(historyEndRef.current);
+    }
+
+    return () => {
+      if (historyEndRef.current) {
+        observer.unobserve(historyEndRef.current);
+      }
+    };
+  }, [useLazyLoading, activeTab, historyLoading, historyPage, historyTotalPages, onLoadMoreHistory]);
 
   const toggleCollection = (id: string) => {
     const newExpanded = new Set(expandedCollections);
@@ -207,10 +249,32 @@ export default function Sidebar({
             </div>
           </div>
         ) : (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-white mb-4">Request History</h2>
-            <div className="space-y-2">
-              {history.slice().reverse().map((item) => (
+          <div className="p-4 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Request History</h2>
+              {onToggleLazyLoading && (
+                <button
+                  onClick={() => onToggleLazyLoading(!useLazyLoading)}
+                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                    useLazyLoading
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                  title={useLazyLoading ? 'Switch to pagination' : 'Switch to lazy loading'}
+                >
+                  {useLazyLoading ? 'Lazy' : 'Page'}
+                </button>
+              )}
+            </div>
+            
+            {historyTotalCount > 0 && !useLazyLoading && (
+              <div className="text-xs text-gray-400 mb-2">
+                Showing {((historyPage - 1) * 10) + 1}-{Math.min(historyPage * 10, historyTotalCount)} of {historyTotalCount}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {history.map((item) => (
                 <div
                   key={item.id}
                   className="p-3 border border-gray-700 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors"
@@ -236,13 +300,71 @@ export default function Sidebar({
                   </div>
                 </div>
               ))}
-              {history.length === 0 && (
+              
+              {/* Loading indicator for lazy loading */}
+              {useLazyLoading && historyLoading && history.length > 0 && (
+                <div className="flex justify-center py-4">
+                  <Loader size={20} className="animate-spin text-blue-400" />
+                </div>
+              )}
+              
+              {/* Intersection observer target for lazy loading */}
+              {useLazyLoading && (
+                <div ref={historyEndRef} className="h-4" />
+              )}
+              
+              {history.length === 0 && !historyLoading && (
                 <div className="text-center py-8 text-gray-500">
                   <History size={48} className="mx-auto mb-2 opacity-50" />
                   <p>No requests in history</p>
                 </div>
               )}
+              
+              {history.length === 0 && historyLoading && (
+                <div className="text-center py-8">
+                  <Loader size={32} className="animate-spin text-blue-400 mx-auto" />
+                </div>
+              )}
             </div>
+
+            {/* Pagination Controls */}
+            {!useLazyLoading && historyTotalPages > 1 && onHistoryPageChange && (
+              <div className="mt-4 pt-4 border-t border-gray-700 flex items-center justify-between">
+                <button
+                  onClick={() => historyPage > 1 && onHistoryPageChange(historyPage - 1)}
+                  disabled={historyPage === 1 || historyLoading}
+                  className="flex items-center gap-1 px-3 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                  Prev
+                </button>
+                
+                <span className="text-sm text-gray-400">
+                  Page {historyPage} of {historyTotalPages}
+                </span>
+                
+                <button
+                  onClick={() => historyPage < historyTotalPages && onHistoryPageChange(historyPage + 1)}
+                  disabled={historyPage >= historyTotalPages || historyLoading}
+                  className="flex items-center gap-1 px-3 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Load More button for lazy loading */}
+            {useLazyLoading && historyPage < historyTotalPages && !historyLoading && onLoadMoreHistory && (
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <button
+                  onClick={onLoadMoreHistory}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Load More ({historyTotalCount - history.length} remaining)
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

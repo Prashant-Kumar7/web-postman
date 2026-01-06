@@ -5,6 +5,7 @@ import RequestBuilder from './components/RequestBuilder';
 import ResponseViewer from './components/ResponseViewer';
 import EnvironmentManager from './components/EnvironmentManager';
 import { StorageService } from './utils/storage';
+import { API_BASE_URL } from './utils/config';
 import type { HttpRequest, HttpResponse, HttpMethod, Collection, Environment, RequestHistory } from './types/api';
 import axios from 'axios';
 
@@ -38,7 +39,7 @@ function App() {
     setEnvironments(StorageService.loadEnvironments());
     setHistory(StorageService.loadHistory());
 
-    axios.get("https://web-postman.onrender.com/history").then((res)=>{
+    axios.get(`${API_BASE_URL}/history`).then((res)=>{
       const result = res.data.data
       
       setHistory(result)
@@ -78,7 +79,7 @@ function App() {
       //   activeEnv?.variables
       // );
 
-      const result = await axios.post("https://web-postman.onrender.com/proxy", {request: currentRequest, environment:activeEnv?.variables})
+      const result = await axios.post(`${API_BASE_URL}/proxy`, {request: currentRequest, environment:activeEnv?.variables})
       console.log(response?.data)
       setResponse(result.data);
       
